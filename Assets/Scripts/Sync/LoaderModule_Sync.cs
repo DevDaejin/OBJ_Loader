@@ -3,7 +3,7 @@ using System.IO;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public class LoaderModule : LoaderModuleBase
+public partial class LoaderModule : LoaderModuleBase
 {
     public override void LoadAsset(string assetName)
     {
@@ -19,6 +19,7 @@ public class LoaderModule : LoaderModuleBase
         for (int i = 0; i < meshDatas.Length; i++)
         {
             GameObject meshGo = ObjectPool.GetObject();
+            meshGo.name = base.meshDatas[i].MeshGameObjectName;
             meshGo.GetComponent<MeshFilter>().mesh = meshDatas[i];
             meshGo.transform.SetParent(go.transform);
         }
