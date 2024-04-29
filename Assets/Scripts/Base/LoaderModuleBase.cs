@@ -149,7 +149,7 @@ public abstract class LoaderModuleBase : MonoBehaviour
             meshData.Triangles.Add(vertexIndices[0]);
         }
         else if (vertexIndices.Length > 4)
-        {// 원점 기준 순회
+        {// 팬 트라이앵글레이션
             for (int j = vertexIndices.Length - 1; j >= 2; j--)
             {
                 meshData.Triangles.Add(vertexIndices[0]);
@@ -167,7 +167,7 @@ public abstract class LoaderModuleBase : MonoBehaviour
     {
         string[] elements = data.Split(FaceSplitChar);
 
-        if (elements.Length <= (int)type || string.IsNullOrEmpty(elements[(int)type]))
+        if (string.IsNullOrEmpty(elements[(int)type]))
         {
             return 0;
         }
