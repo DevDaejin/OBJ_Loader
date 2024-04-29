@@ -1,27 +1,22 @@
-using System;
 using System.IO;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public partial class LoaderModule : LoaderModuleBase
 {
     public override void LoadAsset(string assetName)
     {
-        GameObject go = new GameObject(Path.GetFileName(assetName));
+        GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
 
         //생성 시간 측정 시작
         System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 
-        //데이터 파싱 및 Mesh화
-        Mesh[] meshDatas = CreateObjMesh(assetName);
+        //모델 생성
+        GameObject[] gos = CreateObjMesh(assetName);
 
-        //Mesh 적용
-        for (int i = 0; i < meshDatas.Length; i++)
+        //부모 할당
+        for (int i = 0; i < gos.Length; i++)
         {
-            GameObject meshGo = ObjectPool.GetObject();
-            meshGo.name = base.meshDatas[i].MeshGameObjectName;
-            meshGo.GetComponent<MeshFilter>().mesh = meshDatas[i];
-            meshGo.transform.SetParent(go.transform);
+            gos[i].transform.SetParent(root.transform);
         }
 
         //생성 시간 측정 종료
@@ -29,6 +24,6 @@ public partial class LoaderModule : LoaderModuleBase
         Debug.Log($"{sw.ElapsedMilliseconds * 0.001f} sec");
 
         //콜백
-        OnLoadCompleted.Invoke(go);
+        OnLoadCompleted.Invoke(root);
     }
 }

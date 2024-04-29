@@ -13,7 +13,6 @@ public partial class AssetLoader : AssetLoaderBase
 
     private void SelectObjFile()
     {
-        //asset path
         string selectedAssetName = EditorUtility.OpenFilePanel("Select obj model", "", "obj");
         Load(selectedAssetName);
     }

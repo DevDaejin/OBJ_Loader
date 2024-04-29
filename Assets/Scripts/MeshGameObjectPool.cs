@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using UnityEngine;
 
 public class MeshGameObjectPool : MonoBehaviour
@@ -12,6 +13,7 @@ public class MeshGameObjectPool : MonoBehaviour
 
     private const string MeshGameObjectPath = "Prefabs/MeshGameObject";
     private const string PoolRootName = "PoolRoot";
+    private const string defaultName = "None";
 
     private void Start()
     {
@@ -27,9 +29,8 @@ public class MeshGameObjectPool : MonoBehaviour
 
         for (int i = 0; i < poolInitSize; i++)
         {
-            GameObject go = Instantiate(meshGameObject, poolRoot.transform);
-            go.SetActive(false);
-            objectPool.Enqueue(go);
+            GameObject go = Instantiate(meshGameObject);
+            ReturnObject(go);
         }
     }
 
@@ -52,7 +53,12 @@ public class MeshGameObjectPool : MonoBehaviour
     public void ReturnObject(GameObject go)
     {
         go.transform.SetParent(poolRoot.transform);
+        go.name = defaultName;
         go.SetActive(false);
-        objectPool.Enqueue(go);
+
+        if (!objectPool.Contains(go))
+        {
+            objectPool.Enqueue(go);
+        }
     }
 }
