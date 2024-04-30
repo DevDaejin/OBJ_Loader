@@ -25,31 +25,44 @@ public class ObjMeshBuilder
             meshData.Triangles[i] -= vertexOffset;
         }
 
-        go.GetComponent<MeshFilter>().sharedMesh = CreateMesh();
+        Mesh mesh = new Mesh();
+        Material[] mats = default;
+        CreateData(ref mesh, ref mats);
+        go.GetComponent<MeshFilter>().mesh = mesh;
+        if (mats != null && mats.Length > 0)
+            go.GetComponent<MeshRenderer>().materials = mats;
     }
 
-    private Mesh CreateMesh()
+    private void CreateData(ref Mesh mesh, ref Material[] mats)
     {
+        Debug.Log(meshData.Vertices.Count());
+        Debug.Log(meshData.Triangles.Count());
+
+        if (mesh == null)
+            mesh = new Mesh();
+
         //index가 특정 수 이상 넘어가면 모델이 정상적으로 출력 되지 않음.
-        IndexFormat format = 
-            meshData.Vertices.Count> Limited 
+        IndexFormat format =
+            meshData.Vertices.Count > Limited
             ? IndexFormat.UInt32 : IndexFormat.UInt16;
 
-        Mesh mesh = new Mesh()
+        mesh.indexFormat = format;
+        mesh.SetVertices(meshData.Vertices);
+        mesh.SetUVs(0, meshData.UVs);
+        mesh.SetNormals(meshData.Normals);
+        mesh.subMeshCount = meshData.Materials.Count == 0 ? 1 : meshData.Materials.Count;
+        for (int i = 0; i < mesh.subMeshCount; i++)
         {
-            indexFormat = format,
-            vertices = meshData.Vertices.ToArray(),
-            triangles = meshData.Triangles.ToArray(),
-            uv = meshData.UVs.ToArray(),
-            normals = meshData.Normals.ToArray()
-        };
+            mesh.SetTriangles(meshData.Triangles, i);
+        }
 
-        if(meshData.Normals.Count == 0)
+        if (meshData.Normals.Count == 0)
             mesh.RecalculateNormals();
 
         mesh.RecalculateTangents();
         mesh.RecalculateBounds();
 
-        return mesh;
+        if (mats == null) mats = new Material[meshData.Materials.Count];
+        mats = meshData.Materials.ToArray();
     }
 }

@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class MeshData
 {
-    public string MeshGameObjectName = string.Empty;
+    public string MeshGameObjectName = "default";
     public List<Material> Materials = new List<Material>();
 
     public List<Vector3> Vertices = new List<Vector3>();

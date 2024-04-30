@@ -7,29 +7,32 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button asyncButton;
     [SerializeField] private Button concurrentAsyncButton;
 
-    private AssetLoader assetLoader;
+    private Sync.AssetLoader assetLoaderSync;
+    private Async.AssetLoader assetLoaderAsync;
 
     private void Start()
     {
-        if (!assetLoader) assetLoader = gameObject.AddComponent<AssetLoader>();
+        assetLoaderSync ??= gameObject.AddComponent<Sync.AssetLoader>();
+        assetLoaderAsync ??= gameObject.AddComponent<Async.AssetLoader>();
+
         // 기능 바인딩
         syncButton.onClick.AddListener(LoadOBJSync);
         asyncButton.onClick.AddListener(LoadOBJAsync);
-        concurrentAsyncButton.onClick.AddListener(LoadOBJConcurrentAsync);
+        //concurrentAsyncButton.onClick.AddListener(LoadOBJConcurrentAsync);
     }
 
     void LoadOBJSync()
     {// 동기
-        assetLoader.GetAsset(LoadType.Sync);
+        assetLoaderSync.GetAsset();
     }
 
     void LoadOBJAsync()
     {// 비동기
-        assetLoader.GetAsset(LoadType.Async);
+        assetLoaderAsync.GetAsset();
     }
 
-    void LoadOBJConcurrentAsync()
-    {// 동시 비동기
-        assetLoader.GetAsset(LoadType.ConcurrentAsync);
-    }
+    //void LoadOBJConcurrentAsync()
+    //{// 동시 비동기
+    //    assetLoader.GetAsset(LoadType.ConcurrentAsync);
+    //}
 }
