@@ -4,10 +4,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Xml.Linq;
 using UnityEngine;
 
-public class LoaderModule : MonoBehaviour
+public partial class LoaderModule : MonoBehaviour
 {
     // 콜백
     public Action<GameObject> OnLoadCompleted;
@@ -45,39 +44,25 @@ public class LoaderModule : MonoBehaviour
     public void LoadAsset(string assetName)
     {
         GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
-
         // 기존 생성 모델 초기화
         ObjFileGameObjectPool.Instance.ReturnObjectAll();
-
         // 생성 시간 측정 시작
         System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-
         // 모델 생성
         GameObject[] gos = CreateObjMesh(assetName);
-
         // 부모 할당
         for (int i = 0; i < gos.Length; i++)
         {
             gos[i].transform.SetParent(root.transform);
         }
-
         // 생성 시간 측정 종료
         sw.Stop();
         Debug.Log($"{sw.ElapsedMilliseconds * 0.001f} sec");
-
         //기존 오브젝트 제거
-        foreach (Transform t in transform)
-        {
-            if (t != root)
-            {
-                Destroy(t.gameObject);
-            }
-        }
-
+        DeleteAllChild(root.transform);
         // 콜백
         OnLoadCompleted.Invoke(root);
     }
-
 
     // 현재 작업은 Blender 기준
     // TODO : Max, Maya도 고려 해보자
@@ -100,6 +85,17 @@ public class LoaderModule : MonoBehaviour
         }
 
         return BuildAll();
+    }
+
+    private void DeleteAllChild(Transform root)
+    {
+        foreach (Transform t in transform)
+        {
+            if (t != root)
+            {
+                Destroy(t.gameObject);
+            }
+        }
     }
 
     private void ClearAll()
@@ -133,7 +129,7 @@ public class LoaderModule : MonoBehaviour
             case ConstValue.ObjectToken:
             case ConstValue.GroupToken:
                 {
-                    CreateNewMeshData(words[1]);
+                    if(words.Length > 1) CreateNewMeshData(words[1]);
                 }
                 break;
 
@@ -170,6 +166,9 @@ public class LoaderModule : MonoBehaviour
 
     private void CreateNewMeshData(string name)
     {
+        if (string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name))
+            return; 
+
         meshData = new MeshData();
         meshData.MeshGameObjectName = name;
         builders.Add(new ObjMeshBuilder(meshData));
@@ -302,75 +301,80 @@ public class LoaderModule : MonoBehaviour
         {
             string dirPath = Path.GetDirectoryName(path);
 
-            string lineData = sr.ReadLine();
+            string lineData;
             while ((lineData = sr.ReadLine()) != null)
             {
                 if (string.IsNullOrEmpty(lineData)) continue;
 
-                string[] words = lineData.Split(ConstValue.BlankSplitChar, StringSplitOptions.RemoveEmptyEntries);
-
-                switch (words[0])
-                {
-                    case ConstValue.NewMaterialToken:
-                        currentMaterial = new Material(standardMaterial);
-                        materials.Add(words[1], currentMaterial);
-                        break;
-
-                    case ConstValue.Kd: //Kd = Diffuse Color, Albedo
-                        currentMaterial.color = new Color(
-                            float.Parse(words[1], CultureInfo.InvariantCulture),
-                            float.Parse(words[2], CultureInfo.InvariantCulture),
-                            float.Parse(words[3], CultureInfo.InvariantCulture),
-                            1);
-                        break;
-
-                    case ConstValue.Ks: //Ks = Specular Color, Metallic
-                        currentMaterial.SetFloat(ConstValue.Metallic, float.Parse(words[1], CultureInfo.InvariantCulture));
-                        break;
-
-                    case ConstValue.Ns: //Ns = Smoothness, Glossiness
-                        currentMaterial.SetFloat(ConstValue.Glossiness, float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f);
-                        break;
-
-                    case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
-                        sb.Clear();
-                        sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                        currentMaterial.SetTexture(ConstValue.MainTex, new TextureLoader().GetTexture(this.sb.ToString()));
-                        break;
-
-                    case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
-                        sb.Clear();
-                        sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                        currentMaterial.SetTexture(ConstValue.BumpMap, new TextureLoader().GetTexture(this.sb.ToString()));
-                        currentMaterial.EnableKeyword(ConstValue.NormalMap);
-                        break;
-
-                    case ConstValue.d: // Alpha
-                        float alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
-                        Color color = currentMaterial.color;
-                        if (alpha != 1)
-                        {
-                            color.a *= alpha;
-                            currentMaterial.color = color;
-                            currentMaterial.SetFloat("_Mode", 3);
-                        }
-                        break;
-
-                    case ConstValue.Ke: // Emission
-                        Color emission = new Color(
-                            float.Parse(words[1], CultureInfo.InvariantCulture),
-                            float.Parse(words[2], CultureInfo.InvariantCulture),
-                            float.Parse(words[3], CultureInfo.InvariantCulture),
-                            1);
-
-                        if (emission != Color.black)
-                        {
-                            currentMaterial.SetColor("_EmissionColor", emission);
-                            currentMaterial.EnableKeyword("_EMISSION");
-                        }
-                        break;
-                }
+                MTLDataparsing(lineData);
             }
+        }
+    }
+
+    private void MTLDataparsing(string line)
+    {
+        string[] words = line.Split(ConstValue.BlankSplitChar, StringSplitOptions.RemoveEmptyEntries);
+
+        switch (words[0])
+        {
+            case ConstValue.NewMaterialToken:
+                currentMaterial = new Material(standardMaterial);
+                materials.Add(words[1], currentMaterial);
+                break;
+
+            case ConstValue.Kd: //Kd = Diffuse Color, Albedo
+                currentMaterial.color = new Color(
+                    float.Parse(words[1], CultureInfo.InvariantCulture),
+                    float.Parse(words[2], CultureInfo.InvariantCulture),
+                    float.Parse(words[3], CultureInfo.InvariantCulture),
+                    1);
+                break;
+
+            case ConstValue.Ks: //Ks = Specular Color, Metallic
+                currentMaterial.SetFloat(ConstValue.Metallic, float.Parse(words[1], CultureInfo.InvariantCulture));
+                break;
+
+            case ConstValue.Ns: //Ns = Smoothness, Glossiness
+                currentMaterial.SetFloat(ConstValue.Glossiness, float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f);
+                break;
+
+            case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
+                sb.Clear();
+                sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
+                currentMaterial.SetTexture(ConstValue.MainTex, new TextureLoader().GetTexture(this.sb.ToString()));
+                break;
+
+            case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
+                sb.Clear();
+                sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
+                currentMaterial.SetTexture(ConstValue.BumpMap, new TextureLoader().GetTexture(this.sb.ToString()));
+                currentMaterial.EnableKeyword(ConstValue.NormalMap);
+                break;
+
+            case ConstValue.d: // Alpha
+                float alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
+                Color color = currentMaterial.color;
+                if (alpha != 1)
+                {
+                    color.a *= alpha;
+                    currentMaterial.color = color;
+                    currentMaterial.SetFloat("_Mode", 3);
+                }
+                break;
+
+            case ConstValue.Ke: // Emission
+                Color emission = new Color(
+                    float.Parse(words[1], CultureInfo.InvariantCulture),
+                    float.Parse(words[2], CultureInfo.InvariantCulture),
+                    float.Parse(words[3], CultureInfo.InvariantCulture),
+                    1);
+
+                if (emission != Color.black)
+                {
+                    currentMaterial.SetColor("_EmissionColor", emission);
+                    currentMaterial.EnableKeyword("_EMISSION");
+                }
+                break;
         }
     }
 }

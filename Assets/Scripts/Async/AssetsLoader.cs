@@ -32,15 +32,10 @@ namespace Async
             }
         }
 
-        public void Load(string assetName)
+        public async void Load(string assetName)
         {
-            LoaderModule.OnLoadCompleted += OnLoadCompleted;
-            LoaderModule.LoadAsset(assetName);
-        }
-
-        private void OnLoadCompleted(GameObject loadedAsset)
-        {
-            loadedAsset.transform.SetParent(transform);
+            GameObject loadedAssets = await LoaderModule.LoadAssetAsync(assetName);
+            loadedAssets.transform.SetParent(transform);
         }
     }
 }

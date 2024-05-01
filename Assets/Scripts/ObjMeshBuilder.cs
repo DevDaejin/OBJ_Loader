@@ -16,6 +16,8 @@ public class ObjMeshBuilder
 
     public void Build(ref GameObject go)
     {
+        if (meshData.Vertices.Count == 0) return;
+
         go.name = meshData.MeshGameObjectName;
 
         int vertexOffset = meshData.Triangles.Min();
@@ -35,9 +37,6 @@ public class ObjMeshBuilder
 
     private void CreateData(ref Mesh mesh, ref Material[] mats)
     {
-        Debug.Log(meshData.Vertices.Count());
-        Debug.Log(meshData.Triangles.Count());
-
         if (mesh == null)
             mesh = new Mesh();
 
