@@ -9,16 +9,18 @@ public class Manager : MonoBehaviour
 
     private Sync.AssetLoader assetLoaderSync;
     private Async.AssetLoader assetLoaderAsync;
+    private Concurrent.AssetLoader assetLoaderConcurrent;
 
     private void Start()
     {
         assetLoaderSync ??= gameObject.AddComponent<Sync.AssetLoader>();
         assetLoaderAsync ??= gameObject.AddComponent<Async.AssetLoader>();
+        assetLoaderConcurrent ??= gameObject.AddComponent<Concurrent.AssetLoader>();
 
         // 기능 바인딩
         syncButton.onClick.AddListener(LoadOBJSync);
         asyncButton.onClick.AddListener(LoadOBJAsync);
-        //concurrentAsyncButton.onClick.AddListener(LoadOBJConcurrentAsync);
+        concurrentAsyncButton.onClick.AddListener(LoadOBJConcurrentAsync);
     }
 
     void LoadOBJSync()
@@ -31,8 +33,8 @@ public class Manager : MonoBehaviour
         assetLoaderAsync.GetAsset();
     }
 
-    //void LoadOBJConcurrentAsync()
-    //{// 동시 비동기
-    //    assetLoader.GetAsset(LoadType.ConcurrentAsync);
-    //}
+    void LoadOBJConcurrentAsync()
+    {// 동시 비동기
+        assetLoaderConcurrent.GetAsset();
+    }
 }

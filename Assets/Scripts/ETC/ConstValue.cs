@@ -1,12 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 public class ConstValue
 {
     //공통
     public const char BlankSplitChar = ' ';
     public const char FaceSplitChar = '/';
+    public const char LineSplitChar = '\n';
+    public const char LineCharR = '\r';
 
     //obj
     public const string ObjectToken = "o";
@@ -32,14 +30,21 @@ public class ConstValue
     public const string Kd = "Kd";
     public const string Ks = "Ks";
     public const string Ns = "Ns";
-    public const string Map_Kd = "Map_Kd";
-    public const string Map_Bump = "Map_Bump";
+    public const string Map_Kd = "map_Kd";
+    public const string Map_Bump = "map_Bump";
+    public const string Map_Ns = "map_Ns";
     public const string d = "d";
     public const string Ke = "Ke";
-    public const string NormalMap = "_NORMALMAP";
+
+    public const string RoughnessMap = "_metallicGlossMap";
     public const string BumpMap = "_BumpMap";
     public const string MainTex = "_MainTex";
     public const string Glossiness = "_Glossiness";
     public const string Metallic = "_Metallic";
+    public const string Emission = "_EmissionColor";
     public const string UseMaterialToken = "usemtl";
+
+    public const string NormalMode = "_NORMALMAP";
+    public const string EmissionMode = "_EMISSION";
+    public const string MaterialMode = "_Mode";
 }

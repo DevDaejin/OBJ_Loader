@@ -8,19 +8,18 @@ using UnityEngine;
 
 public partial class LoaderModule : MonoBehaviour
 {
+    [SerializeField] private GameObject LoadingUI;
+
     // 콜백
     public Action<GameObject> OnLoadCompleted;
 
-    // 생성 기반 데이터 ( 블루프린트 )
+    // 생성 기반 데이터
     private MeshData meshData;
+    MatData matData;
+    private Dictionary<string, MatData> matDatas = new Dictionary<string, MatData>();
 
-    // 실 생성
+    // 생성
     private List<ObjMeshBuilder> builders = new List<ObjMeshBuilder>();
-
-    // 메테리얼 관련
-    private Dictionary<string, Material> materials = new Dictionary<string, Material>();
-    private Material standardMaterial;
-    private Material currentMaterial;
 
     // Remap 전 parsing data
     private List<Vector3> tempVertices = new List<Vector3>();
@@ -32,24 +31,32 @@ public partial class LoaderModule : MonoBehaviour
 
     //메모리 최적화를 위해 ..
     private StringBuilder sb = null;
-
     private string path;
 
     private void Start()
     {
-        standardMaterial = new Material(Shader.Find("Standard"));
         sb = new StringBuilder(1024);
+
+        LoadingUI = FindObjectOfType<LoadingUI>(true).gameObject;
     }
 
     public void LoadAsset(string assetName)
     {
+        LoadingUI.SetActive(true);
+
         GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
+
         // 기존 생성 모델 초기화
         ObjFileGameObjectPool.Instance.ReturnObjectAll();
+
         // 생성 시간 측정 시작
         System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-        // 모델 생성
-        GameObject[] gos = CreateObjMesh(assetName);
+
+        //데이터 파싱
+        ParseDatas(assetName);
+        //데이터 생성
+        GameObject[] gos = BuildAll();
+
         // 부모 할당
         for (int i = 0; i < gos.Length; i++)
         {
@@ -57,16 +64,17 @@ public partial class LoaderModule : MonoBehaviour
         }
         // 생성 시간 측정 종료
         sw.Stop();
-        Debug.Log($"{sw.ElapsedMilliseconds * 0.001f} sec");
+        Debug.Log($"{root.name}(sync) - {sw.ElapsedMilliseconds * 0.001f} sec");
         //기존 오브젝트 제거
         DeleteAllChild(root.transform);
         // 콜백
+        LoadingUI.SetActive(false);
         OnLoadCompleted.Invoke(root);
     }
 
     // 현재 작업은 Blender 기준
     // TODO : Max, Maya도 고려 해보자
-    private GameObject[] CreateObjMesh(string path)
+    private void ParseDatas(string path)
     {
         this.path = path;
 
@@ -83,8 +91,6 @@ public partial class LoaderModule : MonoBehaviour
                 DataParsing(lineData);
             }
         }
-
-        return BuildAll();
     }
 
     private void DeleteAllChild(Transform root)
@@ -100,8 +106,6 @@ public partial class LoaderModule : MonoBehaviour
 
     private void ClearAll()
     {
-        materials.Clear();
-
         tempVertices.Clear();
         tempNormals.Clear();
         tempUVs.Clear();
@@ -113,6 +117,8 @@ public partial class LoaderModule : MonoBehaviour
     private void DataParsing(string line)
     {
         string[] words = line.Split(ConstValue.BlankSplitChar, StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0) return;
 
         //g와 s는 별도 처리 없음
         switch (words[0])//Token
@@ -155,9 +161,9 @@ public partial class LoaderModule : MonoBehaviour
                 break;
             case ConstValue.UseMaterialToken:
                 {
-                    if (materials.Keys.Contains(words[1]))
+                    if (matDatas.Keys.Contains(words[1]))
                     {
-                        meshData.Materials.Add(materials[words[1]]);
+                        meshData.MatDatas.Add(words[1]);
                     }
                 }
                 break;
@@ -205,14 +211,7 @@ public partial class LoaderModule : MonoBehaviour
 
                 if (tempNormals.Count > 0)
                 {
-                    try
-                    {
-                        meshData.Normals.Add(tempNormals[normalIndex]);
-                    }
-                    catch
-                    {
-                        Debug.Log(normalIndex);
-                    }
+                    meshData.Normals.Add(tempNormals[normalIndex]);
                 }
 
                 vertexIndecies[i] = meshData.Vertices.Count - 1;
@@ -262,6 +261,8 @@ public partial class LoaderModule : MonoBehaviour
 
     private GameObject[] BuildAll()
     {
+        MaterialManager.Instance.BuildMaterial(matDatas.Values.ToArray());
+
         GameObject[] gos = new GameObject[builders.Count];
 
         for (int i = 0; i < builders.Count; i++)
@@ -277,10 +278,19 @@ public partial class LoaderModule : MonoBehaviour
     private int GetFaceDataElement(string data, FaceType type)
     {
         string[] elements = data.Split(ConstValue.FaceSplitChar);
-        if (string.IsNullOrEmpty(elements[(int)type]) ||
-            string.IsNullOrWhiteSpace(elements[(int)type])) 
-            return 0;
-            
+        try
+        {
+            if (elements.Length <= (int)type ||
+                string.IsNullOrEmpty(elements[(int)type]) ||
+                string.IsNullOrWhiteSpace(elements[(int)type]))
+                return 0;
+        }
+        catch
+        {
+            Debug.Log(data);
+            Debug.Log(type);
+            Debug.Log(elements.Length);
+        }
         return int.Parse(elements[(int)type], CultureInfo.InvariantCulture) - 1;
     }
 
@@ -318,12 +328,16 @@ public partial class LoaderModule : MonoBehaviour
         switch (words[0])
         {
             case ConstValue.NewMaterialToken:
-                currentMaterial = new Material(standardMaterial);
-                materials.Add(words[1], currentMaterial);
+                matData = new MatData();
+                matData.MatName = words[1];
+                if (!matDatas.ContainsKey(words[1]))
+                {
+                    matDatas.Add(words[1], matData);
+                }
                 break;
 
             case ConstValue.Kd: //Kd = Diffuse Color, Albedo
-                currentMaterial.color = new Color(
+                matData.Albedo = new Color(
                     float.Parse(words[1], CultureInfo.InvariantCulture),
                     float.Parse(words[2], CultureInfo.InvariantCulture),
                     float.Parse(words[3], CultureInfo.InvariantCulture),
@@ -331,49 +345,50 @@ public partial class LoaderModule : MonoBehaviour
                 break;
 
             case ConstValue.Ks: //Ks = Specular Color, Metallic
-                currentMaterial.SetFloat(ConstValue.Metallic, float.Parse(words[1], CultureInfo.InvariantCulture));
+                matData.Metallic = float.Parse(words[1], CultureInfo.InvariantCulture);
                 break;
 
             case ConstValue.Ns: //Ns = Smoothness, Glossiness
-                currentMaterial.SetFloat(ConstValue.Glossiness, float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f);
+                matData.Glossiness = float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f;
                 break;
 
-            case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
-                sb.Clear();
-                sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                currentMaterial.SetTexture(ConstValue.MainTex, new TextureLoader().GetTexture(this.sb.ToString()));
-                break;
-
-            case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
-                sb.Clear();
-                sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                currentMaterial.SetTexture(ConstValue.BumpMap, new TextureLoader().GetTexture(this.sb.ToString()));
-                currentMaterial.EnableKeyword(ConstValue.NormalMap);
-                break;
-
-            case ConstValue.d: // Alpha
-                float alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
-                Color color = currentMaterial.color;
-                if (alpha != 1)
+            case ConstValue.Map_Ns: //Map_Ns = Glossiness, Smoothness 텍스처
+                if (words.Length > 1)
                 {
-                    color.a *= alpha;
-                    currentMaterial.color = color;
-                    currentMaterial.SetFloat("_Mode", 3);
+                    sb.Clear();
+                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.TextureMapPaht = sb.ToString();
                 }
                 break;
 
+            case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
+                if (words.Length > 1)
+                {
+                    sb.Clear();
+                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.TextureMapPaht = sb.ToString();
+                }
+                break;
+
+            case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
+                if (words.Length > 1)
+                {
+                    sb.Clear();
+                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.NormalMapPath = sb.ToString();
+                }
+                break;
+
+            case ConstValue.d: // Alpha
+                matData.Alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
+                break;
+
             case ConstValue.Ke: // Emission
-                Color emission = new Color(
+                matData.Emission = new Color(
                     float.Parse(words[1], CultureInfo.InvariantCulture),
                     float.Parse(words[2], CultureInfo.InvariantCulture),
                     float.Parse(words[3], CultureInfo.InvariantCulture),
                     1);
-
-                if (emission != Color.black)
-                {
-                    currentMaterial.SetColor("_EmissionColor", emission);
-                    currentMaterial.EnableKeyword("_EMISSION");
-                }
                 break;
         }
     }

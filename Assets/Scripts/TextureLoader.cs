@@ -2,14 +2,14 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public class TextureLoader : MonoBehaviour
+public class TextureLoader
 {
     public Texture2D GetTexture(string filePath)
     {
         // 파일 경로 검증
         if (!File.Exists(filePath))
         {
-            Debug.LogError("File not found: " + filePath);
+            Debug.LogWarning("File not found: " + filePath);
             return null;
         }
 
@@ -24,7 +24,7 @@ public class TextureLoader : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Failed to load texture from data: " + filePath);
+            Debug.LogWarning("Failed to load texture from data: " + filePath);
             return null;
         }
     }
@@ -34,7 +34,7 @@ public class TextureLoader : MonoBehaviour
         // 파일 경로 검증
         if (!File.Exists(filePath))
         {
-            Debug.LogError("File not found: " + filePath);
+            Debug.LogWarning("File not found: " + filePath);
             return null;
         }
 
@@ -55,7 +55,7 @@ public class TextureLoader : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Failed to load texture from data: " + filePath);
+            Debug.LogWarning("Failed to load texture from data: " + filePath);
             return null;
         }
     }

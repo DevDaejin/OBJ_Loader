@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class ObjMeshBuilder
 {
-    private MeshData meshData;
+    public MeshData meshData;
 
     //uint16 임계치
     private const int Limited = 65536;
@@ -27,18 +27,32 @@ public class ObjMeshBuilder
             meshData.Triangles[i] -= vertexOffset;
         }
 
-        Mesh mesh = new Mesh();
-        Material[] mats = default;
-        CreateData(ref mesh, ref mats);
-        go.GetComponent<MeshFilter>().mesh = mesh;
-        if (mats != null && mats.Length > 0)
-            go.GetComponent<MeshRenderer>().materials = mats;
+        go.GetComponent<MeshFilter>().mesh = CreateMesh();
+        go.GetComponent<MeshRenderer>().materials = GetMaterials();
     }
 
-    private void CreateData(ref Mesh mesh, ref Material[] mats)
+    private Material[] GetMaterials()
     {
-        if (mesh == null)
-            mesh = new Mesh();
+        Material[] mats = new Material[meshData.MatDatas.Count];
+
+        if (mats.Length == 0)
+        {
+            mats = new Material[1];
+            mats[0] = MaterialManager.Instance.DefaultMat;
+        }
+        else
+        {
+            for (int i = 0; i < meshData.MatDatas.Count; i++)
+            {
+                mats[i] = MaterialManager.Instance.GetMaterial(meshData.MatDatas[i]);
+            }
+        }
+        return mats;
+    }
+
+    private Mesh CreateMesh()
+    {
+        Mesh mesh = new Mesh();
 
         //index가 특정 수 이상 넘어가면 모델이 정상적으로 출력 되지 않음.
         IndexFormat format =
@@ -49,7 +63,10 @@ public class ObjMeshBuilder
         mesh.SetVertices(meshData.Vertices);
         mesh.SetUVs(0, meshData.UVs);
         mesh.SetNormals(meshData.Normals);
-        mesh.subMeshCount = meshData.Materials.Count == 0 ? 1 : meshData.Materials.Count;
+        mesh.subMeshCount = meshData.MatDatas.Count;
+
+        if (mesh.subMeshCount == 0) mesh.subMeshCount = 1;
+
         for (int i = 0; i < mesh.subMeshCount; i++)
         {
             mesh.SetTriangles(meshData.Triangles, i);
@@ -61,7 +78,6 @@ public class ObjMeshBuilder
         mesh.RecalculateTangents();
         mesh.RecalculateBounds();
 
-        if (mats == null) mats = new Material[meshData.Materials.Count];
-        mats = meshData.Materials.ToArray();
+        return mesh;
     }
 }
