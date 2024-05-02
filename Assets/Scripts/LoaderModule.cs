@@ -8,8 +8,6 @@ using UnityEngine;
 
 public partial class LoaderModule : MonoBehaviour
 {
-    [SerializeField] private GameObject LoadingUI;
-
     // 콜백
     public Action<GameObject> OnLoadCompleted;
 
@@ -30,20 +28,11 @@ public partial class LoaderModule : MonoBehaviour
     private Dictionary<(int, int, int), int> remapDict = new Dictionary<(int, int, int), int>();
 
     //메모리 최적화를 위해 ..
-    private StringBuilder sb = null;
+    private StringBuilder sb = new StringBuilder();
     private string path;
-
-    private void Start()
-    {
-        sb = new StringBuilder(1024);
-
-        LoadingUI = FindObjectOfType<LoadingUI>(true).gameObject;
-    }
 
     public void LoadAsset(string assetName)
     {
-        LoadingUI.SetActive(true);
-
         GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
 
         // 기존 생성 모델 초기화
@@ -68,7 +57,6 @@ public partial class LoaderModule : MonoBehaviour
         //기존 오브젝트 제거
         DeleteAllChild(root.transform);
         // 콜백
-        LoadingUI.SetActive(false);
         OnLoadCompleted.Invoke(root);
     }
 

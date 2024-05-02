@@ -7,6 +7,8 @@ namespace Async
     {
         [SerializeField] public LoaderModule LoaderModule { get; set; }
 
+        private LoadingUI loadingUI;
+
         private void Start()
         {
             if (!LoaderModule)
@@ -15,6 +17,8 @@ namespace Async
                     FindObjectOfType<LoaderModule>() ??
                     gameObject.AddComponent<LoaderModule>();
             }
+
+            loadingUI = FindObjectOfType<LoadingUI>(true);
         }
 
         public void GetAsset()
@@ -34,8 +38,12 @@ namespace Async
 
         public async void Load(string assetName)
         {
+            loadingUI.gameObject.SetActive(true);
+
             GameObject loadedAssets = await LoaderModule.LoadAssetAsync(assetName);
             loadedAssets.transform.SetParent(transform);
+
+            loadingUI.gameObject.SetActive(false);
         }
     }
 }

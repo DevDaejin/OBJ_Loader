@@ -1,5 +1,6 @@
-using System.Collections.Generic;
+using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -7,8 +8,6 @@ public partial class LoaderModule : MonoBehaviour
 {
     public async Task<GameObject> LoadAssetAsync(string assetName, bool isDeletePrevious = true)
     {
-        LoadingUI.SetActive(true);
-
         GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
         
         // 기존 생성 모델 초기화
@@ -34,7 +33,6 @@ public partial class LoaderModule : MonoBehaviour
         //기존 오브젝트 제거
         DeleteAllChild(root.transform);
 
-        LoadingUI.SetActive(false);
         return root;
     }
 
@@ -43,18 +41,49 @@ public partial class LoaderModule : MonoBehaviour
     private async Task ParseDatasAsync(string path)
     {
         this.path = path;
+        int bufferSize = 1024 * 64;
+        char[] buffer = new char[bufferSize];
 
         using (StreamReader sr = new StreamReader(path))
         {
             ClearAll();
-            
-            string rawData = await sr.ReadToEndAsync();
-            string[] lines = rawData.Split(ConstValue.LineSplitChar);
 
-            for (int i = 0; i < lines.Length; i++)
+            StringBuilder sb = new StringBuilder();
+            int readChars;
+
+            while((readChars = await sr.ReadAsync(buffer, 0, bufferSize)) > 0)
             {
-                lines[i] = lines[i].TrimEnd(ConstValue.LineCharR);
-                DataParsing(lines[i]);
+                sb.Append(buffer, 0, readChars);
+
+                string content = sb.ToString();
+                int contentEndline = content.LastIndexOf(Environment.NewLine);
+
+                if(contentEndline != -1)
+                {
+                    string processed = content.Substring(0, contentEndline);
+                    sb = new StringBuilder(content.Substring(contentEndline + Environment.NewLine.Length));
+
+                    string[] lineData = processed.Split(Environment.NewLine);
+
+                    for (int i = 0; i < lineData.Length; i++)
+                    {
+                        if (string.IsNullOrEmpty(lineData[i])) continue;
+
+                        DataParsing(lineData[i]);
+                    }
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                string[] lineData = sb.ToString().Split(Environment.NewLine);
+
+                for (int i = 0; i < lineData.Length; i++)
+                {
+                    if (string.IsNullOrEmpty(lineData[i])) continue;
+
+                    DataParsing(lineData[i]);
+                }
             }
         }
     }
