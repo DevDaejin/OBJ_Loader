@@ -11,6 +11,9 @@ namespace Sync
         private void Start()
         {
             LoaderModule = new LoaderModule();
+
+            // 콜백
+            LoaderModule.OnLoadCompleted += OnLoadCompleted;
         }
 
         public void GetAsset()
@@ -30,6 +33,7 @@ namespace Sync
 
         public void Load(string assetName)
         {
+            // 이전 오브젝트 초기화
             ObjFileGameObjectPool.Instance.ReturnObjectAll();
 
             foreach(Transform child in transform)
@@ -37,9 +41,8 @@ namespace Sync
                 Destroy(child.gameObject);
             }
 
-            LoaderModule.OnLoadCompleted += OnLoadCompleted;
+            // 데이터 파싱 & 생성
             LoaderModule.LoadAsset(assetName);
-
         }
 
         private void OnLoadCompleted(GameObject loadedAsset)

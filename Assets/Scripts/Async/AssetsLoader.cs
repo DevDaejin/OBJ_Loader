@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+using System;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,8 +13,9 @@ namespace Async
 
         private void Start()
         {
-            LoaderModule = new LoaderModule();
             loadingUI = FindObjectOfType<LoadingUI>(true);
+
+            LoaderModule = new LoaderModule();
         }
 
         public void GetAsset()
@@ -34,6 +36,8 @@ namespace Async
         public async void Load(string assetName)
         {
             loadingUI.gameObject.SetActive(true);
+
+            // 이전 오브젝트 초기화
             ObjFileGameObjectPool.Instance.ReturnObjectAll();
 
             foreach (Transform child in transform)
@@ -41,9 +45,12 @@ namespace Async
                 Destroy(child.gameObject);
             }
 
-            await LoaderModule.LoadAssetAsync(assetName, 32);
-            GameObject loadedAsset = LoaderModule.BuildObj() ;
-            loadedAsset.transform.SetParent(transform);
+            // 데이터 파싱
+            await Task.Run(() => LoaderModule.LoadAssetAsync(assetName));
+
+            // 오브젝트 생성
+            LoaderModule.BuildObj().transform.SetParent(transform);
+
             loadingUI.gameObject.SetActive(false);
         }
     }

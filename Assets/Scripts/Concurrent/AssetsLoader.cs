@@ -12,30 +12,27 @@ namespace Concurrent
     public class AssetLoader : MonoBehaviour
     {
         [SerializeField] public LoaderModule LoaderModule { get; set; }
-        private List<LoaderModule> loaderModules = new List<LoaderModule>();
-
         private StringBuilder pathSb = new StringBuilder();
         private const string Exetension = ".obj";
-
         private LoadingUI loadingUI;
-
+        private System.Diagnostics.Stopwatch sw;
+        //쓰레드 관련
+        private List<LoaderModule> loaderModules = new List<LoaderModule>();
         private int modelSize = 20;
         private int threadSize = 20;
         private SemaphoreSlim semaphore;
-
-        private Queue<Action> mainThreadAction = new Queue<Action>();
-        private Action deqeued;
+        private Queue<Action> mainThreadCallback = new Queue<Action>();
+        private Action callback;
 
         private void Start()
-        {
+        {   
             loadingUI = FindObjectOfType<LoadingUI>(true);
 
+            semaphore = new SemaphoreSlim(threadSize);
             for (int i = 0; i < modelSize; i++)
             {
                 loaderModules.Add(new LoaderModule());
             }
-
-            semaphore = new SemaphoreSlim(threadSize);
         }
 
         public void GetAsset()
@@ -56,17 +53,23 @@ namespace Concurrent
             pathSb.Clear();
             pathSb.Append(Application.dataPath).Append(directory);
 
+            DirectoryInfo dirInfo = null;
             if (Directory.Exists(pathSb.ToString()))
             {
-                DirectoryInfo dirInfo = new DirectoryInfo(pathSb.ToString());
+                dirInfo = new DirectoryInfo(pathSb.ToString());
+            }
+
+            if (dirInfo != null)
+            {
                 FileInfo[] fileInfoArr = dirInfo.GetFiles();
 
+                //오름차순
                 fileInfoArr = fileInfoArr.OrderBy((info) => info.Length).ToArray();
 
                 for (int i = 0; i < fileInfoArr.Length; i++)
                 {
                     if (fileInfoArr[i].Extension.Equals(Exetension))
-                    {
+                    {//obj 파일만
                         fileNames.Add(fileInfoArr[i].FullName);
                     }
                 }
@@ -78,6 +81,8 @@ namespace Concurrent
         public async void Load(List<string> assetName)
         {
             loadingUI.gameObject.SetActive(true);
+
+            // 이전 오브젝트 초기화
             ObjFileGameObjectPool.Instance.ReturnObjectAll();
 
             foreach (Transform child in transform)
@@ -85,20 +90,24 @@ namespace Concurrent
                 Destroy(child.gameObject);
             }
 
+            // 병렬 처리
             List<Task> tasks = new List<Task>();
 
             for (int i = 0; i < assetName.Count && i < threadSize; i++)
             {
-                int index = i; // 클로저 캡처 문제 해결
+                int index = i; // closure 이슈
+
                 tasks.Add(Task.Run(async () =>
                 {
-                    await semaphore.WaitAsync(); // 세마포어 활용하여 동시 실행 제한
+                    await semaphore.WaitAsync();
                     try
                     {
+                        // 데이터 파싱
                         await loaderModules[index].LoadAssetAsync(assetName[index]);
-                        lock (mainThreadAction)
-                        {
-                            mainThreadAction.Enqueue(() =>
+
+                        lock (mainThreadCallback)
+                        {//Unity api 처리용 콜백, 오브젝트 생성
+                            mainThreadCallback.Enqueue(() =>
                             {
                                 loaderModules[index].BuildObj().transform.SetParent(transform);
                             });
@@ -112,40 +121,20 @@ namespace Concurrent
             }
 
             await Task.WhenAll(tasks);
-
-            Debug.Log("XXX");
-
             loadingUI.gameObject.SetActive(false);
         }
 
         private void Update()
         {
-            while(mainThreadAction.Count > 0)
+            while(mainThreadCallback.Count > 0)
             {
-                lock(mainThreadAction)
+                lock(mainThreadCallback)
                 {
-                    deqeued = mainThreadAction.Dequeue();
+                    callback = mainThreadCallback.Dequeue();
                 }
 
-                deqeued?.Invoke();
+                callback?.Invoke();
             }
         }
     }
 }
-
-//await Task.WhenAll(assetName.Select(async asset =>
-//{
-//    await semaphore.WaitAsync();
-//    try
-//    {
-//        await loaderModules[assetName.IndexOf(asset) % loaderModules.Count].LoadAssetAsync(asset);
-//    }
-//    finally
-//    {
-//        semaphore.Release();
-//        loaderModules[assetName.IndexOf(asset)]
-//            .BuildObj()
-//            .transform
-//            .SetParent(transform);
-//    }
-//}));

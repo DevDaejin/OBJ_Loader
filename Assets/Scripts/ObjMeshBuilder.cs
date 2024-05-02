@@ -6,7 +6,7 @@ public class ObjMeshBuilder
 {
     public MeshData meshData;
 
-    //uint16 임계치
+    // uint16 임계치
     private const int Limited = 65536;
 
     public ObjMeshBuilder(MeshData meshData)
@@ -54,7 +54,7 @@ public class ObjMeshBuilder
     {
         Mesh mesh = new Mesh();
 
-        //index가 특정 수 이상 넘어가면 모델이 정상적으로 출력 되지 않음.
+        // index가 특정 수 이상 넘어가면 모델이 정상적으로 출력 되지 않음.
         IndexFormat format =
             meshData.Vertices.Count > Limited
             ? IndexFormat.UInt32 : IndexFormat.UInt16;

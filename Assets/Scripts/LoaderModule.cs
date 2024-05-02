@@ -30,20 +30,21 @@ public partial class LoaderModule
     //메모리 최적화를 위해 ..
     private StringBuilder pathSb = new StringBuilder();
     private string path;
+    private string objName;
 
     public void LoadAsset(string assetName)
     {
-        GameObject root = new GameObject(Path.GetFileNameWithoutExtension(assetName));
+        objName = Path.GetFileNameWithoutExtension(assetName);
 
-        // 기존 생성 모델 초기화
-        ObjFileGameObjectPool.Instance.ReturnObjectAll();
+        GameObject root = new GameObject(objName);
 
         // 생성 시간 측정 시작
         System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 
-        //데이터 파싱
+        // 데이터 파싱
         ParseDatas(assetName);
-        //데이터 생성
+
+        // 데이터 생성
         GameObject[] gos = BuildAll();
 
         // 부모 할당
@@ -58,9 +59,7 @@ public partial class LoaderModule
         // 콜백
         OnLoadCompleted.Invoke(root);
     }
-
-    // 현재 작업은 Blender 기준
-    // TODO : Max, Maya도 고려 해보자
+   
     private void ParseDatas(string path)
     {
         this.path = path;
@@ -96,15 +95,17 @@ public partial class LoaderModule
 
         if (words.Length == 0) return;
 
-        //g와 s는 별도 처리 없음
         switch (words[0])//Token
         {
             case ConstValue.MatLibraryToken:
-                pathSb.Clear();
-                pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                if (File.Exists(pathSb.ToString()))
                 {
-                    UpdateMaterials(pathSb.ToString());
+                    pathSb.Clear();
+                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
+
+                    if (File.Exists(pathSb.ToString()))
+                    {
+                        UpdateMaterials(pathSb.ToString());
+                    }
                 }
                 break;
 
@@ -162,15 +163,20 @@ public partial class LoaderModule
 
         for (int i = 0; i < data.Length; i++)
         {
+
+            // Vtx
             int vertexIndex = GetFaceDataElement(data[i], FaceType.Vertex);
             if (vertexIndex < 0) vertexIndex += tempVertices.Count + 1;
 
+            // UVS
             int uvIndex = GetFaceDataElement(data[i], FaceType.UV);
             if (uvIndex < 0) uvIndex += tempUVs.Count + 1;
             
+            // Nor
             int normalIndex = GetFaceDataElement(data[i], FaceType.Normal);
             if (normalIndex < 0) normalIndex += tempNormals.Count + 1;
 
+            // Remap
             (int, int, int) key = (vertexIndex, uvIndex, normalIndex);
 
             if (!remapDict.ContainsKey(key))
@@ -199,6 +205,7 @@ public partial class LoaderModule
             }
         }
 
+        // 삼각 분할
         Triangulate(vertexIndecies);
     }
 
@@ -254,19 +261,14 @@ public partial class LoaderModule
     private int GetFaceDataElement(string data, FaceType type)
     {
         string[] elements = data.Split(ConstValue.FaceSplitChar);
-        try
+
+        if (elements.Length <= (int)type ||
+            string.IsNullOrEmpty(elements[(int)type]) ||
+            string.IsNullOrWhiteSpace(elements[(int)type]))
         {
-            if (elements.Length <= (int)type ||
-                string.IsNullOrEmpty(elements[(int)type]) ||
-                string.IsNullOrWhiteSpace(elements[(int)type]))
-                return 0;
+            return 0;
         }
-        catch
-        {
-            Debug.Log(data);
-            Debug.Log(type);
-            Debug.Log(elements.Length);
-        }
+ 
         return int.Parse(elements[(int)type], CultureInfo.InvariantCulture) - 1;
     }
 
@@ -301,70 +303,89 @@ public partial class LoaderModule
     {
         string[] words = line.Split(ConstValue.BlankSplitChar, StringSplitOptions.RemoveEmptyEntries);
 
+        //Token
         switch (words[0])
         {
             case ConstValue.NewMaterialToken:
-                matData = new MatData();
-                matData.MatName = words[1];
-                if (!matDatas.ContainsKey(words[1]))
                 {
-                    matDatas.Add(words[1], matData);
+                    matData = new MatData();
+                    matData.MatName = words[1];
+                    if (!matDatas.ContainsKey(words[1]))
+                    {
+                        matDatas.Add(words[1], matData);
+                    }
                 }
                 break;
 
-            case ConstValue.Kd: //Kd = Diffuse Color, Albedo
-                matData.Albedo = new Color(
-                    float.Parse(words[1], CultureInfo.InvariantCulture),
-                    float.Parse(words[2], CultureInfo.InvariantCulture),
-                    float.Parse(words[3], CultureInfo.InvariantCulture),
-                    1);
-                break;
-
-            case ConstValue.Ks: //Ks = Specular Color, Metallic
-                matData.Metallic = float.Parse(words[1], CultureInfo.InvariantCulture);
-                break;
-
-            case ConstValue.Ns: //Ns = Smoothness, Glossiness
-                matData.Glossiness = float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f;
-                break;
-
-            case ConstValue.Map_Ns: //Map_Ns = Glossiness, Smoothness 텍스처
-                if (words.Length > 1)
+            case ConstValue.Kd: // Kd = Diffuse Color, Albedo
                 {
-                    pathSb.Clear();
-                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.TextureMapPaht = pathSb.ToString();
+                    matData.Albedo = new Color(
+                        float.Parse(words[1], CultureInfo.InvariantCulture),
+                        float.Parse(words[2], CultureInfo.InvariantCulture),
+                        float.Parse(words[3], CultureInfo.InvariantCulture),
+                        1);
                 }
                 break;
 
-            case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
-                if (words.Length > 1)
+            case ConstValue.Ks: // Ks = Specular Color, Metallic
                 {
-                    pathSb.Clear();
-                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.TextureMapPaht = pathSb.ToString();
+                    matData.Metallic = float.Parse(words[1], CultureInfo.InvariantCulture);
                 }
                 break;
 
-            case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
-                if (words.Length > 1)
+            case ConstValue.Ns: // Ns = Smoothness, Glossiness
                 {
-                    pathSb.Clear();
-                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.NormalMapPath = pathSb.ToString();
+                    matData.Glossiness = float.Parse(words[1], CultureInfo.InvariantCulture) * 0.001f;
+                }
+                break;
+
+            case ConstValue.Map_Ns: // Map_Ns = Glossiness, Smoothness 텍스처
+                {
+                    if (words.Length > 1)
+                    {
+                        pathSb.Clear();
+                        pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                        matData.TextureMapPaht = pathSb.ToString();
+                    }
+                }
+                break;
+
+            case ConstValue.Map_Kd: // Map_Kd = Diffuse Texture, Albedo 텍스처
+                {
+                    if (words.Length > 1)
+                    {
+                        pathSb.Clear();
+                        pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                        matData.TextureMapPaht = pathSb.ToString();
+                    }
+                }
+                break;
+
+            case ConstValue.Map_Bump: // Map_Bump = Bump Mapping, Normal Map 텍스처
+                {
+                    if (words.Length > 1)
+                    {
+                        pathSb.Clear();
+                        pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                        matData.NormalMapPath = pathSb.ToString();
+                    }
                 }
                 break;
 
             case ConstValue.d: // Alpha
-                matData.Alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
+                {
+                    matData.Alpha = float.Parse(words[1], CultureInfo.InvariantCulture);
+                }
                 break;
 
             case ConstValue.Ke: // Emission
-                matData.Emission = new Color(
-                    float.Parse(words[1], CultureInfo.InvariantCulture),
-                    float.Parse(words[2], CultureInfo.InvariantCulture),
-                    float.Parse(words[3], CultureInfo.InvariantCulture),
-                    1);
+                {
+                    matData.Emission = new Color(
+                        float.Parse(words[1], CultureInfo.InvariantCulture),
+                        float.Parse(words[2], CultureInfo.InvariantCulture),
+                        float.Parse(words[3], CultureInfo.InvariantCulture),
+                        1);
+                }
                 break;
         }
     }

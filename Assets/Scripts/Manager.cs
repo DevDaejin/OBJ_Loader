@@ -18,8 +18,6 @@ public class Manager : MonoBehaviour
 
     private void Start()
     {
-        Application.targetFrameRate = 60;
-
         assetLoaderSync ??= gameObject.AddComponent<Sync.AssetLoader>();
         assetLoaderAsync ??= gameObject.AddComponent<Async.AssetLoader>();
         assetLoaderConcurrent ??= gameObject.AddComponent<Concurrent.AssetLoader>();
@@ -41,7 +39,7 @@ public class Manager : MonoBehaviour
     }
 
     void LoadOBJConcurrentAsync()
-    {// 동시 비동기
+    {// 병렬
         assetLoaderConcurrent.GetAsset();
     }
 

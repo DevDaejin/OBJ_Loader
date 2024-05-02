@@ -6,15 +6,14 @@ using UnityEngine;
 
 public partial class LoaderModule
 {
-    private int bufferRatio = 1;
-    private StringBuilder readingSb = new StringBuilder();
     private System.Diagnostics.Stopwatch sw;
-    private string objName;
-    public async Task LoadAssetAsync(string assetName, int bufferRatio = 64)
+    private StringBuilder readingSb = new StringBuilder();
+    private const int BufferSize = 64;
+
+    public async Task LoadAssetAsync(string assetName)
     {
-        this.bufferRatio = bufferRatio;
         objName = Path.GetFileNameWithoutExtension(assetName);
-        //Debug.Log($"{objName} - Thread : {System.Threading.Thread.CurrentThread.ManagedThreadId}");
+
         // 생성 시간 측정 시작
         sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -42,13 +41,12 @@ public partial class LoaderModule
         return root;
     }
 
-
-    // 현재 작업은 Blender 기준
-    // TODO : Max, Maya도 고려 해보자
     private async Task ParseDatasAsync(string path)
     {
         this.path = path;
-        int bufferSize = 1024 * bufferRatio;
+
+        // 버퍼 세팅
+        int bufferSize = 1024 * BufferSize;
         char[] buffer = new char[bufferSize];
 
         using (StreamReader sr = new StreamReader(path))
@@ -60,20 +58,26 @@ public partial class LoaderModule
 
             while ((readChars = await sr.ReadAsync(buffer, 0, bufferSize)) > 0)
             {
+                // 버퍼만큼 데이터 추가
                 readingSb.Append(buffer, 0, readChars);
 
+                // 버퍼 데이터 텍스트화
                 string content = readingSb.ToString();
+
                 int contentEndline = content.LastIndexOf(Environment.NewLine);
 
                 if (contentEndline != -1)
                 {
+                    // 파싱
                     string processed = content.Substring(0, contentEndline);
-                    readingSb = readingSb.Remove(0, contentEndline + Environment.NewLine.Length);
-
                     ParseData(processed);
+
+                    // 처리한 데이터 삭제
+                    readingSb = readingSb.Remove(0, contentEndline + Environment.NewLine.Length);
                 }
             }
 
+            // 남은 데이터 처리
             if (readingSb.Length > 0)
             {
                 ParseData(readingSb.ToString());
