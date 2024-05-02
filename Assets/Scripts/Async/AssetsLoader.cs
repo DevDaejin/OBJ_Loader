@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,13 +12,7 @@ namespace Async
 
         private void Start()
         {
-            if (!LoaderModule)
-            {
-                LoaderModule =
-                    FindObjectOfType<LoaderModule>() ??
-                    gameObject.AddComponent<LoaderModule>();
-            }
-
+            LoaderModule = new LoaderModule();
             loadingUI = FindObjectOfType<LoadingUI>(true);
         }
 
@@ -39,10 +34,16 @@ namespace Async
         public async void Load(string assetName)
         {
             loadingUI.gameObject.SetActive(true);
+            ObjFileGameObjectPool.Instance.ReturnObjectAll();
 
-            GameObject loadedAssets = await LoaderModule.LoadAssetAsync(assetName);
-            loadedAssets.transform.SetParent(transform);
+            foreach (Transform child in transform)
+            {
+                Destroy(child.gameObject);
+            }
 
+            await LoaderModule.LoadAssetAsync(assetName, 32);
+            GameObject loadedAsset = LoaderModule.BuildObj() ;
+            loadedAsset.transform.SetParent(transform);
             loadingUI.gameObject.SetActive(false);
         }
     }

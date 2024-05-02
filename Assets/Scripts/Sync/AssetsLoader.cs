@@ -10,12 +10,7 @@ namespace Sync
 
         private void Start()
         {
-            if (!LoaderModule)
-            {
-                LoaderModule =
-                    FindObjectOfType<LoaderModule>() ??
-                    gameObject.AddComponent<LoaderModule>();
-            }
+            LoaderModule = new LoaderModule();
         }
 
         public void GetAsset()
@@ -35,8 +30,16 @@ namespace Sync
 
         public void Load(string assetName)
         {
+            ObjFileGameObjectPool.Instance.ReturnObjectAll();
+
+            foreach(Transform child in transform)
+            {
+                Destroy(child.gameObject);
+            }
+
             LoaderModule.OnLoadCompleted += OnLoadCompleted;
             LoaderModule.LoadAsset(assetName);
+
         }
 
         private void OnLoadCompleted(GameObject loadedAsset)

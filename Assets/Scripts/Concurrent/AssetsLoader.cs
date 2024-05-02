@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -10,18 +12,30 @@ namespace Concurrent
     public class AssetLoader : MonoBehaviour
     {
         [SerializeField] public LoaderModule LoaderModule { get; set; }
+        private List<LoaderModule> loaderModules = new List<LoaderModule>();
 
-        private StringBuilder sb = new StringBuilder();
+        private StringBuilder pathSb = new StringBuilder();
         private const string Exetension = ".obj";
+
+        private LoadingUI loadingUI;
+
+        private int modelSize = 20;
+        private int threadSize = 20;
+        private SemaphoreSlim semaphore;
+
+        private Queue<Action> mainThreadAction = new Queue<Action>();
+        private Action deqeued;
 
         private void Start()
         {
-            if (!LoaderModule)
+            loadingUI = FindObjectOfType<LoadingUI>(true);
+
+            for (int i = 0; i < modelSize; i++)
             {
-                LoaderModule =
-                    FindObjectOfType<LoaderModule>() ??
-                    gameObject.AddComponent<LoaderModule>();
+                loaderModules.Add(new LoaderModule());
             }
+
+            semaphore = new SemaphoreSlim(threadSize);
         }
 
         public void GetAsset()
@@ -39,11 +53,12 @@ namespace Concurrent
         {
             List<string> fileNames = new List<string>();
 
-            string path = sb.Append(Application.dataPath).Append(directory).ToString();
+            pathSb.Clear();
+            pathSb.Append(Application.dataPath).Append(directory);
 
-            if (Directory.Exists(path))
+            if (Directory.Exists(pathSb.ToString()))
             {
-                DirectoryInfo dirInfo = new DirectoryInfo(path);
+                DirectoryInfo dirInfo = new DirectoryInfo(pathSb.ToString());
                 FileInfo[] fileInfoArr = dirInfo.GetFiles();
 
                 fileInfoArr = fileInfoArr.OrderBy((info) => info.Length).ToArray();
@@ -62,19 +77,75 @@ namespace Concurrent
 
         public async void Load(List<string> assetName)
         {
-            List<Task<GameObject>> taskList = new List<Task<GameObject>>();
+            loadingUI.gameObject.SetActive(true);
+            ObjFileGameObjectPool.Instance.ReturnObjectAll();
 
-            for (int i = 0; i < assetName.Count; i++)
+            foreach (Transform child in transform)
             {
-                taskList.Add(LoaderModule.LoadAssetAsync(assetName[i]));
+                Destroy(child.gameObject);
             }
 
-            GameObject[] loadedObjs = await Task.WhenAll(taskList);
+            List<Task> tasks = new List<Task>();
 
-            for (int i = 0; i < loadedObjs.Length; i++)
+            for (int i = 0; i < assetName.Count && i < threadSize; i++)
             {
-                loadedObjs[i].transform.SetParent(transform);
+                int index = i; // 클로저 캡처 문제 해결
+                tasks.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync(); // 세마포어 활용하여 동시 실행 제한
+                    try
+                    {
+                        await loaderModules[index].LoadAssetAsync(assetName[index]);
+                        lock (mainThreadAction)
+                        {
+                            mainThreadAction.Enqueue(() =>
+                            {
+                                loaderModules[index].BuildObj().transform.SetParent(transform);
+                            });
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            Debug.Log("XXX");
+
+            loadingUI.gameObject.SetActive(false);
+        }
+
+        private void Update()
+        {
+            while(mainThreadAction.Count > 0)
+            {
+                lock(mainThreadAction)
+                {
+                    deqeued = mainThreadAction.Dequeue();
+                }
+
+                deqeued?.Invoke();
             }
         }
     }
 }
+
+//await Task.WhenAll(assetName.Select(async asset =>
+//{
+//    await semaphore.WaitAsync();
+//    try
+//    {
+//        await loaderModules[assetName.IndexOf(asset) % loaderModules.Count].LoadAssetAsync(asset);
+//    }
+//    finally
+//    {
+//        semaphore.Release();
+//        loaderModules[assetName.IndexOf(asset)]
+//            .BuildObj()
+//            .transform
+//            .SetParent(transform);
+//    }
+//}));

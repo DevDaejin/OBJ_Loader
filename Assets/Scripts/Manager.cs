@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,12 +8,18 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button asyncButton;
     [SerializeField] private Button concurrentAsyncButton;
 
+    [SerializeField] private TMP_Text fps;
+
+    private float delta;
+
     private Sync.AssetLoader assetLoaderSync;
     private Async.AssetLoader assetLoaderAsync;
     private Concurrent.AssetLoader assetLoaderConcurrent;
 
     private void Start()
     {
+        Application.targetFrameRate = 60;
+
         assetLoaderSync ??= gameObject.AddComponent<Sync.AssetLoader>();
         assetLoaderAsync ??= gameObject.AddComponent<Async.AssetLoader>();
         assetLoaderConcurrent ??= gameObject.AddComponent<Concurrent.AssetLoader>();
@@ -36,5 +43,11 @@ public class Manager : MonoBehaviour
     void LoadOBJConcurrentAsync()
     {// 동시 비동기
         assetLoaderConcurrent.GetAsset();
+    }
+
+    private void Update()
+    {
+        delta += (Time.deltaTime - delta) * 0.1f;
+        fps.text = (1 / delta).ToString();
     }
 }

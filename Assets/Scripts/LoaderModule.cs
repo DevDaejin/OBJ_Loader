@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-public partial class LoaderModule : MonoBehaviour
+public partial class LoaderModule
 {
     // 콜백
     public Action<GameObject> OnLoadCompleted;
@@ -28,7 +28,7 @@ public partial class LoaderModule : MonoBehaviour
     private Dictionary<(int, int, int), int> remapDict = new Dictionary<(int, int, int), int>();
 
     //메모리 최적화를 위해 ..
-    private StringBuilder sb = new StringBuilder();
+    private StringBuilder pathSb = new StringBuilder();
     private string path;
 
     public void LoadAsset(string assetName)
@@ -54,8 +54,7 @@ public partial class LoaderModule : MonoBehaviour
         // 생성 시간 측정 종료
         sw.Stop();
         Debug.Log($"{root.name}(sync) - {sw.ElapsedMilliseconds * 0.001f} sec");
-        //기존 오브젝트 제거
-        DeleteAllChild(root.transform);
+
         // 콜백
         OnLoadCompleted.Invoke(root);
     }
@@ -76,18 +75,7 @@ public partial class LoaderModule : MonoBehaviour
             {
                 if (string.IsNullOrEmpty(lineData)) continue;
 
-                DataParsing(lineData);
-            }
-        }
-    }
-
-    private void DeleteAllChild(Transform root)
-    {
-        foreach (Transform t in transform)
-        {
-            if (t != root)
-            {
-                Destroy(t.gameObject);
+                ParseLine(lineData);
             }
         }
     }
@@ -102,7 +90,7 @@ public partial class LoaderModule : MonoBehaviour
         builders.Clear();
     }
 
-    private void DataParsing(string line)
+    private void ParseLine(string line)
     {
         string[] words = line.Split(ConstValue.BlankSplitChar, StringSplitOptions.RemoveEmptyEntries);
 
@@ -112,11 +100,11 @@ public partial class LoaderModule : MonoBehaviour
         switch (words[0])//Token
         {
             case ConstValue.MatLibraryToken:
-                sb.Clear();
-                sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
-                if (File.Exists(sb.ToString()))
+                pathSb.Clear();
+                pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[1]);
+                if (File.Exists(pathSb.ToString()))
                 {
-                    UpdateMaterials(sb.ToString());
+                    UpdateMaterials(pathSb.ToString());
                 }
                 break;
 
@@ -343,27 +331,27 @@ public partial class LoaderModule : MonoBehaviour
             case ConstValue.Map_Ns: //Map_Ns = Glossiness, Smoothness 텍스처
                 if (words.Length > 1)
                 {
-                    sb.Clear();
-                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.TextureMapPaht = sb.ToString();
+                    pathSb.Clear();
+                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.TextureMapPaht = pathSb.ToString();
                 }
                 break;
 
             case ConstValue.Map_Kd: //Map_Kd = Diffuse Texture, Albedo 텍스처
                 if (words.Length > 1)
                 {
-                    sb.Clear();
-                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.TextureMapPaht = sb.ToString();
+                    pathSb.Clear();
+                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.TextureMapPaht = pathSb.ToString();
                 }
                 break;
 
             case ConstValue.Map_Bump: //Map_Bump = Bump Mapping, Normal Map 텍스처
                 if (words.Length > 1)
                 {
-                    sb.Clear();
-                    sb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
-                    matData.NormalMapPath = sb.ToString();
+                    pathSb.Clear();
+                    pathSb.Append(Path.GetDirectoryName(path)).Append("/").Append(words[words.Length - 1]);
+                    matData.NormalMapPath = pathSb.ToString();
                 }
                 break;
 
