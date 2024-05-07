@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace Concurrent
         private int modelSize = 20;
         private int threadSize = 20;
         private SemaphoreSlim semaphore;
-        private Queue<Action> mainThreadCallback = new Queue<Action>();
+        private ConcurrentQueue<Action> mainThreadCallback = new ConcurrentQueue<Action>();
         private Action callback;
 
         private void Start()
@@ -105,13 +106,10 @@ namespace Concurrent
                         // 데이터 파싱
                         await loaderModules[index].LoadAssetAsync(assetName[index]);
 
-                        lock (mainThreadCallback)
+                        mainThreadCallback.Enqueue(() =>
                         {//Unity api 처리용 콜백, 오브젝트 생성
-                            mainThreadCallback.Enqueue(() =>
-                            {
-                                loaderModules[index].BuildObj().transform.SetParent(transform);
-                            });
-                        }
+                            loaderModules[index].BuildObj().transform.SetParent(transform);
+                        });
                     }
                     finally
                     {
@@ -128,11 +126,7 @@ namespace Concurrent
         {
             while(mainThreadCallback.Count > 0)
             {
-                lock(mainThreadCallback)
-                {
-                    callback = mainThreadCallback.Dequeue();
-                }
-
+                mainThreadCallback.TryDequeue(out callback);
                 callback?.Invoke();
             }
         }
